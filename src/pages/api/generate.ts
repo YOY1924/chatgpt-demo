@@ -13,11 +13,18 @@ const passList = sitePassword.split(',') || []
 
 export const post: APIRoute = async(context) => {
   const body = await context.request.json()
-  const { sign, time, messages, pass } = body
+  const { sign, time, messages, pass, token } = body
   if (!messages) {
     return new Response(JSON.stringify({
       error: {
         message: 'No input text.',
+      },
+    }), { status: 400 })
+  }
+  if (!token) {
+    return new Response(JSON.stringify({
+      error: {
+        message: '请刷新页面重试',
       },
     }), { status: 400 })
   }
@@ -51,8 +58,8 @@ export const post: APIRoute = async(context) => {
   let is_black = 0
   if (match_res)
     is_black = 1
-
-  const resp1 = await fetch(`${import.meta.env.API_URL}/plugin/freesite/accesslog?ip=${ip}&url=${context.url}&is_black=${is_black}`, {
+  const encode_token = encodeURIComponent(token)
+  const resp1 = await fetch(`${import.meta.env.API_URL}/plugin/freesite/accesslog?ip=${ip}&url=${context.url}&is_black=${is_black}&token=${encode_token}`, {
     headers: {
       'Content-Type': 'application/json',
     },

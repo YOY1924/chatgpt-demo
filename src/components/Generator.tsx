@@ -18,7 +18,11 @@ export default () => {
   const [loading, setLoading] = createSignal(false)
   const [controller, setController] = createSignal<AbortController>(null)
   const [isStick, setStick] = createSignal(false)
+  const [token, setToken] = createSignal('')
+  const [showCf, setShowCf] = createSignal(false)
 
+  // 展示cf
+  setShowCf(true)
   createEffect(() => (isStick() && smoothToBottom()))
   // 禁止调试
   function stopDebugging() {
@@ -27,7 +31,7 @@ export default () => {
       console.clear()
     }, 1000)
   }
-  stopDebugging()
+  // stopDebugging()
   onMount(() => {
     let lastPostion = window.scrollY
 
@@ -56,7 +60,40 @@ export default () => {
     onCleanup(() => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     })
+    if (token() === '') {
+      setShowCf(true)
+      cfRender()
+    } else {
+      setShowCf(false)
+    }
   })
+
+  const cfRender = () => {
+    turnstile.render('#captcha-container', {
+      sitekey: '0x4AAAAAAAWAIH1uebPMp_UX',
+      callback: (token) => {
+        console.log(`Verification success ${token}`)
+        handleVerifyCf(token)
+      },
+    })
+  }
+  const handleVerifyCf = async(token) => {
+    // 在此处将token传递给后端进行二次验证
+    const response = await fetch('/api/verify', {
+      method: 'POST',
+      body: JSON.stringify({
+        token,
+      }),
+    })
+    const responseJson = await response.json()
+    if (responseJson.code === 200) {
+      setToken(responseJson.data)
+      setShowCf(false)
+    } else {
+      cfRender()
+      setShowCf(true)
+    }
+  }
 
   const handleBeforeUnload = () => {
     sessionStorage.setItem('messageList', JSON.stringify(messageList()))
@@ -115,6 +152,7 @@ export default () => {
             t: timestamp,
             m: requestMessageList?.[requestMessageList.length - 1]?.content || '',
           }),
+          token: token(),
         }),
         signal: controller.signal,
       })
@@ -230,45 +268,61 @@ export default () => {
         />
       )}
       { currentError() && <ErrorMessageItem data={currentError()} onRetry={retryLastFetch} /> }
-      <Show
-        when={!loading()}
-        fallback={() => (
-          <div class="gen-cb-wrapper">
-            <span>AI思考中...</span>
-            <div class="gen-cb-stop" onClick={stopStreamFetch}>停止</div>
+
+      <Show when={!showCf()}>
+        <Show
+          when={!loading()}
+          fallback={() => (
+            <div class="gen-cb-wrapper">
+              <span>AI思考中...</span>
+              <div class="gen-cb-stop" onClick={stopStreamFetch}>停止</div>
+            </div>
+          )}
+        >
+          <div class="gen-text-wrapper" class:op-50={systemRoleEditing()}>
+            <textarea
+              ref={inputRef!}
+              disabled={systemRoleEditing()}
+              onKeyDown={handleKeydown}
+              placeholder="输入任何问题..."
+              autocomplete="off"
+              autofocus
+              onInput={() => {
+                inputRef.style.height = 'auto'
+                inputRef.style.height = `${inputRef.scrollHeight}px`
+              }}
+              rows="1"
+              class="gen-textarea"
+            />
+            <button class="w-28" onClick={handleButtonClick} disabled={systemRoleEditing()} gen-slate-btn>
+              发送
+            </button>
+            <button title="Clear" onClick={clear} disabled={systemRoleEditing()} gen-slate-btn>
+              <IconClear />
+            </button>
           </div>
-        )}
-      >
-        <div class="gen-text-wrapper" class:op-50={systemRoleEditing()}>
-          <textarea
-            ref={inputRef!}
-            disabled={systemRoleEditing()}
-            onKeyDown={handleKeydown}
-            placeholder="输入任何问题..."
-            autocomplete="off"
-            autofocus
-            onInput={() => {
-              inputRef.style.height = 'auto'
-              inputRef.style.height = `${inputRef.scrollHeight}px`
-            }}
-            rows="1"
-            class="gen-textarea"
-          />
-          <button class="w-28" onClick={handleButtonClick} disabled={systemRoleEditing()} gen-slate-btn>
-            发送
-          </button>
-          <button title="Clear" onClick={clear} disabled={systemRoleEditing()} gen-slate-btn>
-            <IconClear />
-          </button>
+        </Show>
+        <div class="fixed bottom-5 left-5 rounded-md hover:bg-slate/10 w-fit h-fit transition-colors active:scale-90" class:stick-btn-on={isStick()}>
+          <div>
+            <button class="p-2.5 text-base" title="stick to bottom" type="button" onClick={() => setStick(!isStick())}>
+              <div i-ph-arrow-line-down-bold />
+            </button>
+          </div>
         </div>
+
       </Show>
-      <div class="fixed bottom-5 left-5 rounded-md hover:bg-slate/10 w-fit h-fit transition-colors active:scale-90" class:stick-btn-on={isStick()}>
-        <div>
-          <button class="p-2.5 text-base" title="stick to bottom" type="button" onClick={() => setStick(!isStick())}>
-            <div i-ph-arrow-line-down-bold />
-          </button>
+      <Show when={showCf()}>
+        <div >
+          <h1 style={{ 'font-size': '24px', 'color': '#333' }}>aifree.site</h1>
+          <p style={{ 'font-size': '16px', 'color': '#666' }}>
+            正在验证您是否是真人。这可能需要几秒钟时间。
+          </p>
+          <p style={{ 'font-size': '16px', 'color': '#666' }}>
+            继续之前, aifree.site需要先检查您的连接的安全性。
+          </p>
         </div>
-      </div>
+        <div id="captcha-container" />
+      </Show>
     </div>
   )
 }
