@@ -8,6 +8,7 @@
     "build": "astro build",
     "build:vercel": "OUTPUT=vercel astro build",
     "build:netlify": "OUTPUT=netlify astro build",
+    "build:cloudflare": "astro build",
     "preview": "astro preview",
     "astro": "astro",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.astro",
